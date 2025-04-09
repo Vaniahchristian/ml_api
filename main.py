@@ -1,5 +1,4 @@
-import functions_framework
-from flask import jsonify, request
+from flask import Flask, jsonify, request
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 from tensorflow.keras.preprocessing import image
@@ -8,9 +7,14 @@ from PIL import Image
 import numpy as np
 import io
 import time
+import os
+from flask_cors import CORS
+
+app = Flask(__name__)
+CORS(app)
 
 # Class mappings
-eczema_class_names = {
+eczema_class_names = {  
     0: 'Acne and Rosacea',
     1: 'Normal',
     2: 'Vitiligo',
@@ -168,17 +172,13 @@ def get_skincare_tips():
     print(f"Skincare tips generation took {end_skincare - start_skincare:.2f} seconds")
     return tips
 
-@functions_framework.http
-def predict(request):
+@app.route('/predict', methods=['POST'])
+def predict():
     start_request = time.time()
     print("Received prediction request")
     print(f"Request method: {request.method}")
     print(f"Request headers: {dict(request.headers)}")
     print(f"Request files: {list(request.files.keys())}")
-
-    if request.method != 'POST':
-        print("Invalid method: Expected POST")
-        return jsonify({'error': 'Use POST to /predict'}), 400
 
     if 'image' not in request.files:
         print("No image in request")
@@ -243,3 +243,11 @@ def predict(request):
     except Exception as e:
         print("Error during prediction:", str(e))
         return jsonify({'error': str(e)}), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
+if __name__ == '__main__':
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port)

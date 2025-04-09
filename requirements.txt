@@ -1,9 +1,8 @@
 flask==2.3.3
 tensorflow==2.17.0
 pillow==10.0.0
-numpy
+numpy==1.24.0
 flask-cors==4.0.0
-gunicorn==21.2.0
-functions-framework==3.*
-
-
+gunicorn>=19.2.0,<21.0
+opencv-python-headless>=4.8.0
+functions-framework==3.0.0
