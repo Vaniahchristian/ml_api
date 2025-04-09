@@ -172,8 +172,12 @@ def get_skincare_tips():
 def predict(request):
     start_request = time.time()
     print("Received prediction request")
+    print(f"Request method: {request.method}")
+    print(f"Request headers: {dict(request.headers)}")
+    print(f"Request files: {list(request.files.keys())}")
 
     if request.method != 'POST':
+        print("Invalid method: Expected POST")
         return jsonify({'error': 'Use POST to /predict'}), 400
 
     if 'image' not in request.files:
@@ -184,6 +188,7 @@ def predict(request):
         image_file = request.files['image']
         print(f"Image received: {image_file.filename}")
         image_bytes = image_file.read()
+        print(f"Image size: {len(image_bytes)} bytes")
 
         print("Preprocessing for VGG19")
         img_array_vgg = preprocess_image_for_vgg(image_bytes)
