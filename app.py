@@ -12,6 +12,7 @@ import os
 app = Flask(__name__)
 CORS(app)
 
+
 # Class mappings
 eczema_class_names = {
     0: 'Acne and Rosacea',
