@@ -4,5 +4,6 @@ pillow==10.0.0
 numpy
 flask-cors==4.0.0
 gunicorn==21.2.0
+functions-framework==3.*
 
 
