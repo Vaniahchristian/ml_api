@@ -207,7 +207,8 @@ def predict():
         features_flat = vgg_features.reshape(1, -1)
         eczema_preds = eczema_model.predict(features_flat, verbose=0)
         eczema_class = int(np.argmax(eczema_preds[0]))
-        eczema_label = eczema_class_names[eczema_class]
+        eczema_label_raw = eczema_class_names[eczema_class]
+        eczema_label = 'Eczema' if eczema_label_raw == 'Eczema' else 'No Eczema'
         eczema_confidence = float(eczema_preds[0][eczema_class])
         end_eczema = time.time()
         print(f"Eczema model prediction took {end_eczema - start_eczema:.2f} seconds")
