@@ -9,6 +9,18 @@ import io
 import time
 import os
 from flask_cors import CORS
+import google.generativeai as genai
+import tempfile
+import sys
+from dotenv import load_dotenv
+load_dotenv()  # This loads variables from the .env file into the environment
+
+# Gemini API configuration
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    print("Error: GEMINI_API_KEY environment variable not set.")
+    sys.exit(1)
+genai.configure(api_key=GEMINI_API_KEY)
 
 app = Flask(__name__)
 CORS(app)
@@ -107,51 +119,108 @@ def predict_with_tflite(model_interpreter, img_array):
 
 def get_treatment_recommendations(severity, body_part):
     start_recommendations = time.time()
+    
+    # General tips for all eczema cases
     general_tips = [
-        "Keep the affected area clean and moisturized",
-        "Avoid scratching the affected area",
-        "Wear loose, breathable clothing",
-        "Use fragrance-free products"
+        "Moisturize 2-3 times daily with fragrance-free creams (e.g., CeraVe, Vanicream)",
+        "Take short, lukewarm showers (5-10 minutes) and pat skin dry",
+        "Use hypoallergenic, fragrance-free soaps and detergents",
+        "Avoid triggers (e.g., wool, fragrances, stress) through a trigger journal",
+        "Wear loose, breathable cotton clothing"
     ]
+    
+    # Severity-specific treatments based on evidence-based guidelines
     severe_treatments = [
-        "Consult a dermatologist immediately",
-        "Consider prescription topical corticosteroids",
-        "Use wet wrap therapy",
-        "Monitor for signs of infection"
+        "Consult a dermatologist for biologics (e.g., dupilumab/Dupixent) or oral JAK inhibitors (e.g., upadacitinib/Rinvoq)",
+        "keep a trigger journal to identify and avoid irritants like harsh soaps or stress.", 
+        "Use high-potency prescription corticosteroids (e.g., clobetasol) for short-term flares (1-2 weeks)",
+        "Apply wet wrap therapy over moisturizers or topicals to enhance efficacy",
+        "Consider phototherapy (narrowband UVB) under medical supervision",
+        "Monitor for infections (redness, oozing) and seek antibiotics if needed"
     ]
+    
     moderate_treatments = [
-        "Apply over-the-counter hydrocortisone cream",
-        "Use antihistamines to reduce itching",
-        "Apply cold compresses to reduce inflammation",
-        "Consider phototherapy treatment"
+        "Use prescription non-steroidal topicals (e.g., tacrolimus/Protopic, crisaborole/Eucrisa)",
+        "Apply medium-potency corticosteroids (e.g., triamcinolone) as prescribed",
+        "Take sedating antihistamines (e.g., diphenhydramine/Benadryl) for nighttime itching",
+        "Use bleach baths (1/4 cup bleach per 40-gallon tub) to reduce bacterial infections",
+        "Apply cold compresses to soothe inflammation"
     ]
+    
     mild_treatments = [
-        "Use emollients regularly",
-        "Apply calamine lotion for itching",
-        "Take lukewarm baths with colloidal oatmeal",
-        "Identify and avoid triggers"
+        "Apply OTC hydrocortisone 1% cream for mild flares (up to 2 weeks)",
+        "Use ceramide-based moisturizers (e.g., CeraVe, Aveeno Eczema Therapy) after bathing",
+        "Take colloidal oatmeal baths (e.g., Aveeno Soothing Bath Treatment) for itch relief",
+        "Apply coconut oil or calamine lotion for mild dryness and itching",
+        "Identify and avoid irritants (e.g., harsh soaps, dust mites)"
     ]
+    
+    # Body-part-specific recommendations, tailored for eczema treatment
     body_part_specific = {
-        'Face': ["Use gentle, non-comedogenic products", "Avoid harsh facial scrubs"],
-        'Hand': ["Wear protective gloves when using cleaning products", "Apply moisturizer after washing hands"],
-        'Foot': ["Wear cotton socks", "Keep feet dry and well-ventilated"],
-        'Eye': ["Avoid rubbing eyes", "Use hypoallergenic eye products"],
-        'Neck': ["Avoid wearing tight necklaces", "Keep neck area dry"],
-        'Elbow': ["Apply extra moisturizer to elbow area", "Avoid leaning on elbows"],
-        'Knee': ["Wear loose-fitting pants", "Avoid kneeling for long periods"],
-        'Belly': ["Wear loose, cotton clothing", "Keep the area dry"],
-        'Ear': ["Keep ears dry", "Avoid ear piercings during flare-ups"],
-        'Shoulders': ["Avoid shoulder straps that can irritate", "Keep shoulders moisturized"]
+        'Eye': [
+            "Use non-steroidal topicals (e.g., tacrolimus/Protopic) to avoid steroid-related risks",
+            "Avoid eye makeup and rubbing eyes to prevent irritation"
+        ],
+        'Nose': [
+            "Use gentle, non-comedogenic moisturizers to avoid clogging pores",
+            "Avoid nasal sprays with irritants"
+        ],
+        'Neck': [
+            "Apply non-steroidal topicals for sensitive skin (e.g., pimecrolimus/Elidel)",
+            "Avoid tight collars or jewelry that may irritate"
+        ],
+        'Hand': [
+            "Apply thick ointments (e.g., Vaseline) after handwashing",
+            "Wear cotton gloves at night to lock in moisturizer; use vinyl gloves for cleaning"
+        ],
+        'Elbow': [
+            "Apply extra moisturizer to thick skin areas; consider occlusion with bandages",
+            "Use medium-potency steroids for flares if prescribed"
+        ],
+        'Knee': [
+            "Apply thick creams to prevent cracking; avoid kneeling on rough surfaces",
+            "Wear loose pants to reduce friction"
+        ],
+        'Foot': [
+            "Use antifungal creams if fungal infection is suspected; keep feet dry",
+            "Wear breathable cotton socks and change frequently"
+        ],
+        'Belly': [
+            "Apply ceramide-based creams to large areas; avoid tight clothing",
+            "Keep skin dry to prevent bacterial growth"
+        ],
+        'Ear': [
+            "Use non-steroidal topicals for sensitive ear skin; keep ears dry",
+            "Avoid earbuds or piercings during flares"
+        ],
+        'Shoulders': [
+            "Apply moisturizers after showers; avoid heavy backpacks with straps",
+            "Use loose, cotton shirts to minimize irritation"
+        ]
     }
+    
+    # Select treatments based on severity
     if severity == "Severe":
         recommendations = severe_treatments
     elif severity == "Moderate":
         recommendations = moderate_treatments
     else:
         recommendations = mild_treatments
-    if body_part in body_part_specific:
-        recommendations.extend(body_part_specific[body_part])
+    
+    # Add body-part-specific recommendations if applicable (robust lookup)
+    body_part_key = body_part.capitalize()
+    if body_part_key in body_part_specific:
+        recommendations.extend(body_part_specific[body_part_key])
+    elif body_part_key.rstrip('s') in body_part_specific:
+        recommendations.extend(body_part_specific[body_part_key.rstrip('s')])
+    elif body_part_key.lower() in body_part_specific:
+        recommendations.extend(body_part_specific[body_part_key.lower()])
+    elif body_part_key.lower().rstrip('s') in body_part_specific:
+        recommendations.extend(body_part_specific[body_part_key.lower().rstrip('s')])
+    
+    # Always include general tips
     recommendations.extend(general_tips)
+    
     end_recommendations = time.time()
     print(f"Treatment recommendations took {end_recommendations - start_recommendations:.2f} seconds")
     return recommendations
@@ -190,12 +259,41 @@ def predict():
         image_bytes = image_file.read()
         print(f"Image size: {len(image_bytes)} bytes")
 
+        # Save uploaded image to a temporary file for Gemini
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_img:
+            tmp_img.write(image_bytes)
+            tmp_img_path = tmp_img.name
+
+        # --- Gemini skin check ---
+        gemini_model = genai.GenerativeModel('gemini-2.0-flash')
+        img_pil = Image.open(tmp_img_path)
+        if img_pil.mode != 'RGB':
+            img_pil = img_pil.convert('RGB')
+        prompt_skin = "Does this image predominantly feature human skin? Respond with a single word: Yes or No."
+        print(f"Sending image to Gemini for skin analysis...")
+        skin_response = gemini_model.generate_content([prompt_skin, img_pil])
+        skin_classification = skin_response.text.strip().lower()
+        print(f"Gemini skin response: '{skin_classification}'")
+        if skin_classification != 'yes':
+            os.unlink(tmp_img_path)
+            return jsonify({'error': 'The uploaded image does not predominantly feature human skin. Please upload a suitable image.'}), 400
+
+        # --- Gemini body part classification (anatomical, single word) ---
+        prompt_bodypart = (
+            "What is the main human body part shown in this image? "
+            "Respond with a single word, the anatomical name only (e.g., 'knee', 'ear', 'hand', 'foot'), "
+            "and do not include any adjectives or descriptors."
+        )
+        print(f"Sending image to Gemini for body part classification...")
+        bodypart_response = gemini_model.generate_content([prompt_bodypart, img_pil])
+        body_label = bodypart_response.text.strip()
+        print(f"Gemini body part response: '{body_label}'")
+        os.unlink(tmp_img_path)
+        body_confidence = None  # Gemini does not provide a confidence score
+
+        # Continue with VGG/Eczema model as before
         print("Preprocessing for VGG19")
         img_array_vgg = preprocess_image_for_vgg(image_bytes)
-
-        print("Preprocessing for body part model")
-        img_array_bodypart = preprocess_image_for_bodypart(image_bytes)
-
         start_vgg = time.time()
         print("Running VGG prediction")
         vgg_features = vgg_model.predict(img_array_vgg, verbose=0)
@@ -213,18 +311,14 @@ def predict():
         end_eczema = time.time()
         print(f"Eczema model prediction took {end_eczema - start_eczema:.2f} seconds")
 
-        start_tflite = time.time()
-        print("Running body part prediction")
-        body_preds = predict_with_tflite(interpreter, img_array_bodypart)
-        body_class = int(np.argmax(body_preds[0]))
-        body_label = body_part_class_names[body_class]
-        body_confidence = float(body_preds[0][body_class])
-        end_tflite = time.time()
-        print(f"Body part prediction took {end_tflite - start_tflite:.2f} seconds")
-
-        severity = get_severity(eczema_confidence)
+        severity = get_severity(eczema_confidence) if eczema_label == 'Eczema' else None
         recommendations = get_treatment_recommendations(severity, body_label) if eczema_label == 'Eczema' else []
         skincare_tips = get_skincare_tips() if eczema_label != 'Eczema' else []
+
+        # Disclaimer for all recommendations
+        disclaimer = "Disclaimer: These AI-generated recommendations are for informational purposes only. Consult a dermatologist to confirm diagnosis and treatment, especially for severe or persistent symptoms."
+        if eczema_label == 'Eczema':
+            recommendations.append(disclaimer)
 
         response = {
             'eczemaPrediction': eczema_label,
